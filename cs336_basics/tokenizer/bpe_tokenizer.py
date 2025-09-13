@@ -1,6 +1,6 @@
 import pstats
 from typing import Iterable, Iterator
-import cs336_basics.bpe_train as bpe_train
+import cs336_basics.tokenizer.bpe_train as bpe_train
 import cs336_basics.utils as utils
 import regex as re
 import cProfile
