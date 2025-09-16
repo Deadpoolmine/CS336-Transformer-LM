@@ -28,7 +28,6 @@ class RotaryPositionEmbedding(torch.nn.Module):
         self.theta = theta
         self.d_k = d_k
         self.max_seq_len = max_seq_len
-
         rotate_blocks = torch.zeros((max_seq_len, d_k, d_k), device=device)
 
         for i in range(max_seq_len):

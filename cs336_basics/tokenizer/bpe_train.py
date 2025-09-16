@@ -257,10 +257,13 @@ def train_bpe(
 
 def load_vocab(vocab_filepath: str) -> dict[int, bytes]:
     vocab = {}
+    # vocab_filepath is json file
+    import json
     with open(vocab_filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            token, token_id = line.strip().split()
-            vocab[int(token_id)] = bytes(token, "utf-8")
+        vocab_json: dict[str, bytes] = json.load(f)
+        for k, v in vocab_json.items():
+            k_encoded = k.encode("utf-8")
+            vocab[int(v)] = bytes(k_encoded)
     return vocab
 
 def load_merges(merges_filepath: str) -> list[tuple[bytes, bytes]]:

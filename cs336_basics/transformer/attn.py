@@ -4,7 +4,7 @@ import torch
 from jaxtyping import Bool, Float, Int
 from einops import rearrange, einsum
 
-from cs336_basics.embedding import RotaryPositionEmbedding
+from cs336_basics.transformer.embedding import RotaryPositionEmbedding
 
 
 def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
@@ -12,6 +12,23 @@ def softmax(x: torch.Tensor, dim: int) -> torch.Tensor:
     x_exp = torch.exp(x - x_max)
     x_exp_sum = x_exp.sum(dim=dim, keepdim=True)
     return x_exp / x_exp_sum
+
+
+def cross_entropy(
+    logits: Float[torch.Tensor, "batch vocab"],
+    target_ids: Int[torch.Tensor, " batch"],
+) -> Float[torch.Tensor, ""]:
+
+    logits_max = logits.amax(dim=-1, keepdim=True)
+    logits_exp = torch.exp(logits - logits_max)
+    logits_exp_sum = logits_exp.sum(dim=-1, keepdim=True)
+
+    log_probs = logits - logits_max - torch.log(logits_exp_sum)
+
+    target_log_probs = log_probs[torch.arange(logits.shape[0]), target_ids]
+
+    negative_log_likelihood = -target_log_probs.mean()
+    return negative_log_likelihood
 
 
 def scaled_dot_product_attention(
@@ -28,11 +45,12 @@ def scaled_dot_product_attention(
         K,
         "batch ... queries d_k, batch ... keys d_k -> batch ... queries keys",
     )
-
+    
     pre_softmax_qk = QK / (d_k**0.5)
 
     # apply mask if provided
     if mask is not None:
+        print(pre_softmax_qk.shape, mask.shape)
         # adding a very large negative number to masked positions before softmax
         very_large_negative = -1e9
         pre_softmax_qk = pre_softmax_qk + very_large_negative * (~mask)
@@ -128,7 +146,6 @@ class MultiheadSelfAttention(torch.nn.Module):
                 and self.theta is not None
                 and self.token_positions is not None
             ), "max_seq_len, theta, token_positions must be provided when use_rope is True"
-
             rope = RotaryPositionEmbedding(
                 theta=self.theta,
                 d_k=Q_h.shape[-1],
@@ -145,9 +162,8 @@ class MultiheadSelfAttention(torch.nn.Module):
             )
             mask = causal_masks
 
-        batch_size = x.shape[0]
         # expand mask for batch -> [batch, seq, seq]
-        mask_h = rearrange(mask, "q k -> 1 q k").expand(batch_size, -1, -1)
+        mask_h = rearrange(mask, "q k -> 1 q k").expand(self.num_heads, -1, -1)
 
         attn = scaled_dot_product_attention(Q_h, K_h, V_h, mask=mask_h)
         attn = rearrange(attn, "batch head seq d_v -> batch seq (head d_v)")

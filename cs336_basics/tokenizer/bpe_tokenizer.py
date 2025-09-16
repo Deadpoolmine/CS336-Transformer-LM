@@ -35,8 +35,8 @@ class Tokenizer:
         # for vocab_id, vocab_bytes in self.vocab.items():
         #     tokenizer_debug_print(f"{vocab_id}: {vocab_bytes}")
 
+    @staticmethod
     def from_files(
-        self,
         vocab_filepath: str,
         merges_filepath: str,
         special_tokens: list[str] | None = None,

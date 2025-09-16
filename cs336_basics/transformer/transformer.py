@@ -3,12 +3,12 @@ from einops import rearrange, einsum
 
 from jaxtyping import Bool, Float, Int
 
-from cs336_basics.attn import MultiheadSelfAttention
-from cs336_basics.attn import softmax
-from cs336_basics.norm import RMSNorm
-from cs336_basics.ffn import FFN
-from cs336_basics.embedding import Embedding
-from cs336_basics.linear import Linear
+from cs336_basics.transformer.attn import MultiheadSelfAttention
+from cs336_basics.transformer.attn import softmax
+from cs336_basics.transformer.norm import RMSNorm
+from cs336_basics.transformer.ffn import FFN
+from cs336_basics.transformer.embedding import Embedding
+from cs336_basics.transformer.linear import Linear
 
 
 class TransformerBlock(torch.nn.Module):
@@ -89,7 +89,9 @@ class TransformerBlock(torch.nn.Module):
             use_rope=True,
         )
 
-        norm.load_state_dict({"learned_scale": self.weights["ln1.weight"]})
+        if self.weights["ln1.weight"] is not None:
+            norm.load_state_dict({"learned_scale": self.weights["ln1.weight"]})
+
         attn_x = attn(norm(x))
         x = x + attn_x  # residual connection
 
@@ -102,7 +104,9 @@ class TransformerBlock(torch.nn.Module):
             w3_weight=self.weights["ffn.w3.weight"],
         )
 
-        norm.load_state_dict({"learned_scale": self.weights["ln2.weight"]})
+        if self.weights["ln2.weight"] is not None:
+            norm.load_state_dict({"learned_scale": self.weights["ln2.weight"]})
+
         ffn_x = ffn(norm(x))
         final = x + ffn_x  # residual connection
 
@@ -128,6 +132,7 @@ class Transformer(torch.nn.Module):
         self.ffn_d_ff = ffn_d_ff
         self.max_seq_len = max_seq_len
         self.theta = theta
+
         self.weights = weights
 
         """
@@ -188,10 +193,11 @@ class Transformer(torch.nn.Module):
         """
 
         embed = Embedding(num_embeddings=vocab_size, embedding_dim=d_model)
-        embed.load_state_dict(
-            {"embedding_matrix": self.weights["token_embeddings.weight"]}
-        )
-
+        if self.weights["token_embeddings.weight"] is not None:
+            embed.load_state_dict(
+                {"embedding_matrix": self.weights["token_embeddings.weight"]}
+            )
+        
         layers = [
             TransformerBlock(
                 d_model=self.d_model,
@@ -209,13 +215,17 @@ class Transformer(torch.nn.Module):
         ]
 
         norm_final = RMSNorm(d_model)
-        norm_final.load_state_dict({"learned_scale": self.weights["ln_final.weight"]})
+        if self.weights["ln_final.weight"] is not None:
+            norm_final.load_state_dict(
+                {"learned_scale": self.weights["ln_final.weight"]}
+            )
 
         output_embed = Linear(
             in_features=d_model,
             out_features=vocab_size,
         )
-        output_embed.load_state_dict({"weight": self.weights["lm_head.weight"]})
+        if self.weights["lm_head.weight"] is not None:
+            output_embed.load_state_dict({"weight": self.weights["lm_head.weight"]})
 
         self.layers = torch.nn.ModuleList(
             [
@@ -225,13 +235,13 @@ class Transformer(torch.nn.Module):
                 output_embed,
             ]
         )
-        
+
         print(num_layers)
         print(self.layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for layer in self.layers:
             x = layer(x)
-        
+
         # ??? softmax at the end ???
         return x
